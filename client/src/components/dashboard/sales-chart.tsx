@@ -7,9 +7,9 @@ export default function SalesChart() {
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg font-semibold text-gray-900">Sales Overview</CardTitle>
-          <Select defaultValue="7days">
+          <Select defaultValue="7days" aria-label="Select sales data range">
             <SelectTrigger className="w-32">
-              <SelectValue />
+              <SelectValue aria-label="Selected sales data range" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="7days">Last 7 days</SelectItem>
@@ -20,7 +20,7 @@ export default function SalesChart() {
         </div>
       </CardHeader>
       <CardContent>
-        <div className="h-64 bg-gray-50 rounded-lg flex items-center justify-center">
+        <div className="h-64 bg-gray-50 rounded-lg flex items-center justify-center" role="img" aria-label="Sales Chart Visualization Placeholder">
           <p className="text-gray-500">Sales Chart Visualization</p>
           <p className="text-sm text-gray-400 ml-2">(Chart component would be implemented here)</p>
         </div>

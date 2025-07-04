@@ -11,15 +11,15 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import ProductForm from "./product-form";
-import type { Product } from "@shared/schema";
+import { Product as ProductType } from "@shared/schema";
 
 export default function InventoryTable() {
   const [showProductForm, setShowProductForm] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [editingProduct, setEditingProduct] = useState<ProductType | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
 
-  const { data: products, isLoading } = useQuery<Product[]>({
+  const { data: products, isLoading } = useQuery<ProductType[]>({
     queryKey: ["/api/products"],
   });
 
@@ -72,7 +72,7 @@ export default function InventoryTable() {
     return <Badge variant="default" className="bg-green-100 text-green-800">In Stock</Badge>;
   };
 
-  const handleEdit = (product: Product) => {
+  const handleEdit = (product: ProductType) => {
     setEditingProduct(product);
     setShowProductForm(true);
   };
@@ -100,8 +100,9 @@ export default function InventoryTable() {
         <Button 
           onClick={() => setShowProductForm(true)}
           className="mt-4 sm:mt-0 bg-primary-500 hover:bg-primary-600"
+          aria-label="Add New Product"
         >
-          <Plus className="w-4 h-4 mr-2" />
+          <Plus className="w-4 h-4 mr-2" aria-hidden="true" />
           Add Product
         </Button>
       </div>
@@ -111,15 +112,16 @@ export default function InventoryTable() {
         <CardContent className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="relative">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" aria-hidden="true" />
               <Input
                 placeholder="Search products..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
+                aria-label="Search products by name or SKU"
               />
             </div>
-            <Select>
+            <Select aria-label="Filter by category">
               <SelectTrigger>
                 <SelectValue placeholder="All Categories" />
               </SelectTrigger>
@@ -129,7 +131,7 @@ export default function InventoryTable() {
                 <SelectItem value="home">Home & Garden</SelectItem>
               </SelectContent>
             </Select>
-            <Select>
+            <Select aria-label="Filter by stock status">
               <SelectTrigger>
                 <SelectValue placeholder="All Status" />
               </SelectTrigger>
@@ -139,8 +141,8 @@ export default function InventoryTable() {
                 <SelectItem value="out-of-stock">Out of Stock</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="outline">
-              <Filter className="w-4 h-4 mr-2" />
+            <Button variant="outline" aria-label="Apply Filters">
+              <Filter className="w-4 h-4 mr-2" aria-hidden="true" />
               Apply Filters
             </Button>
           </div>
@@ -151,23 +153,23 @@ export default function InventoryTable() {
       <Card>
         <CardContent className="p-0">
           {isLoading ? (
-            <div className="p-8 text-center">Loading products...</div>
+            <div className="p-8 text-center" role="status" aria-live="polite">Loading products...</div>
           ) : filteredProducts.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">
+            <div className="p-8 text-center text-gray-500" role="status" aria-live="polite">
               No products found. {searchQuery && "Try adjusting your search terms."}
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <Table>
+              <Table aria-label="Inventory Products">
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Product</TableHead>
-                    <TableHead>SKU</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Stock</TableHead>
-                    <TableHead>Price</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
+                    <TableHead scope="col">Product</TableHead>
+                    <TableHead scope="col">SKU</TableHead>
+                    <TableHead scope="col">Category</TableHead>
+                    <TableHead scope="col">Stock</TableHead>
+                    <TableHead scope="col">Price</TableHead>
+                    <TableHead scope="col">Status</TableHead>
+                    <TableHead scope="col">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -190,16 +192,18 @@ export default function InventoryTable() {
                             variant="outline"
                             size="sm"
                             onClick={() => handleEdit(product)}
+                            aria-label={`Edit ${product.name}`}
                           >
-                            <Edit className="w-4 h-4" />
+                            <Edit className="w-4 h-4" aria-hidden="true" />
                           </Button>
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => handleDelete(product.id)}
                             className="text-red-600 hover:text-red-700"
+                            aria-label={`Delete ${product.name}`}
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-4 h-4" aria-hidden="true" />
                           </Button>
                         </div>
                       </TableCell>

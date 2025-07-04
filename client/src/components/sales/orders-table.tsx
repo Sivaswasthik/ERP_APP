@@ -11,14 +11,14 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import OrderForm from "./order-form";
-import type { Order } from "@shared/schema";
+import { Order as OrderType } from "@shared/schema";
 
 export default function OrdersTable() {
   const [showOrderForm, setShowOrderForm] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
 
-  const { data: orders, isLoading } = useQuery<Order[]>({
+  const { data: orders, isLoading } = useQuery<OrderType[]>({
     queryKey: ["/api/orders"],
   });
 
@@ -105,15 +105,17 @@ export default function OrdersTable() {
           <Button 
             onClick={() => setShowOrderForm(true)}
             className="bg-primary-500 hover:bg-primary-600"
+            aria-label="Create New Sale Order"
           >
-            <Plus className="w-4 h-4 mr-2" />
+            <Plus className="w-4 h-4 mr-2" aria-hidden="true" />
             New Sale
           </Button>
           <Button 
             variant="outline"
             onClick={() => setShowOrderForm(true)}
+            aria-label="Create New Purchase Order"
           >
-            <ShoppingCart className="w-4 h-4 mr-2" />
+            <ShoppingCart className="w-4 h-4 mr-2" aria-hidden="true" />
             New Purchase
           </Button>
         </div>
@@ -126,9 +128,9 @@ export default function OrdersTable() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Today's Sales</p>
-                <p className="text-2xl font-bold text-gray-900">${todaysSales.toFixed(2)}</p>
+                <p className="text-2xl font-bold text-gray-900" aria-live="polite">${todaysSales.toFixed(2)}</p>
               </div>
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center" aria-hidden="true">
                 <TrendingUp className="text-green-600 text-xl" />
               </div>
             </div>
@@ -140,9 +142,9 @@ export default function OrdersTable() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Pending Orders</p>
-                <p className="text-2xl font-bold text-gray-900">{pendingOrders}</p>
+                <p className="text-2xl font-bold text-gray-900" aria-live="polite">{pendingOrders}</p>
               </div>
-              <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
+              <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center" aria-hidden="true">
                 <Clock className="text-yellow-600 text-xl" />
               </div>
             </div>
@@ -154,9 +156,9 @@ export default function OrdersTable() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Total Purchases</p>
-                <p className="text-2xl font-bold text-gray-900">${totalPurchases.toFixed(2)}</p>
+                <p className="text-2xl font-bold text-gray-900" aria-live="polite">${totalPurchases.toFixed(2)}</p>
               </div>
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center" aria-hidden="true">
                 <ShoppingCart className="text-blue-600 text-xl" />
               </div>
             </div>
@@ -171,15 +173,16 @@ export default function OrdersTable() {
             <CardTitle>Recent Orders</CardTitle>
             <div className="flex space-x-3 mt-4 sm:mt-0">
               <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" aria-hidden="true" />
                 <Input
                   placeholder="Search orders..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10 w-64"
+                  aria-label="Search orders by order ID or customer name"
                 />
               </div>
-              <Select>
+              <Select aria-label="Filter orders by status">
                 <SelectTrigger className="w-32">
                   <SelectValue placeholder="All Status" />
                 </SelectTrigger>
@@ -195,22 +198,22 @@ export default function OrdersTable() {
         </CardHeader>
         <CardContent className="p-0">
           {isLoading ? (
-            <div className="p-8 text-center">Loading orders...</div>
+            <div className="p-8 text-center" role="status" aria-live="polite">Loading orders...</div>
           ) : filteredOrders.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">
+            <div className="p-8 text-center text-gray-500" role="status" aria-live="polite">
               No orders found. {searchQuery && "Try adjusting your search terms."}
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <Table>
+              <Table aria-label="Recent Orders">
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Order ID</TableHead>
-                    <TableHead>Customer</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
+                    <TableHead scope="col">Order ID</TableHead>
+                    <TableHead scope="col">Customer</TableHead>
+                    <TableHead scope="col">Date</TableHead>
+                    <TableHead scope="col">Amount</TableHead>
+                    <TableHead scope="col">Status</TableHead>
+                    <TableHead scope="col">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -230,8 +233,8 @@ export default function OrdersTable() {
                       <TableCell>{getStatusBadge(order.status)}</TableCell>
                       <TableCell>
                         <div className="flex space-x-2">
-                          <Button variant="outline" size="sm">
-                            <Eye className="w-4 h-4" />
+                          <Button variant="outline" size="sm" aria-label={`View details for order ${order.orderNumber}`}>
+                            <Eye className="w-4 h-4" aria-hidden="true" />
                           </Button>
                           {order.status === "pending" && (
                             <Button
@@ -239,13 +242,14 @@ export default function OrdersTable() {
                               size="sm"
                               onClick={() => handleCompleteOrder(order.id)}
                               className="text-green-600 hover:text-green-700"
+                              aria-label={`Mark order ${order.orderNumber} as completed`}
                             >
-                              <CheckCircle className="w-4 h-4" />
+                              <CheckCircle className="w-4 h-4" aria-hidden="true" />
                             </Button>
                           )}
                           {order.status === "completed" && (
-                            <Button variant="outline" size="sm" className="text-blue-600 hover:text-blue-700">
-                              <FileText className="w-4 h-4" />
+                            <Button variant="outline" size="sm" className="text-blue-600 hover:text-blue-700" aria-label={`View invoice for order ${order.orderNumber}`}>
+                              <FileText className="w-4 h-4" aria-hidden="true" />
                             </Button>
                           )}
                         </div>

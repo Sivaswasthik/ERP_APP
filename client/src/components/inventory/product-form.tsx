@@ -11,18 +11,13 @@ import { ArrowLeft } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
-import { insertProductSchema, type Product } from "@shared/schema";
+import { insertProductSchema, type IProduct } from "@shared/schema";
 import { z } from "zod";
 
-const formSchema = insertProductSchema.extend({
-  price: z.string().min(1, "Price is required"),
-  stock: z.string().min(1, "Stock is required"),
-});
-
-type FormData = z.infer<typeof formSchema>;
+type FormData = z.infer<typeof insertProductSchema>;
 
 interface ProductFormProps {
-  product?: Product | null;
+  product?: IProduct | null;
   onClose: () => void;
 }
 
@@ -31,30 +26,24 @@ export default function ProductForm({ product, onClose }: ProductFormProps) {
   const isEditing = !!product;
 
   const form = useForm<FormData>({
-    resolver: zodResolver(formSchema),
+    resolver: zodResolver(insertProductSchema),
     defaultValues: {
       name: product?.name || "",
       description: product?.description || "",
       sku: product?.sku || "",
       category: product?.category || "",
-      price: product?.price?.toString() || "",
-      stock: product?.stock?.toString() || "",
+      price: product?.price || 0,
+      stock: product?.stock || 0,
       status: product?.status || "active",
     },
   });
 
   const createMutation = useMutation({
     mutationFn: async (data: FormData) => {
-      const payload = {
-        ...data,
-        price: data.price,
-        stock: parseInt(data.stock),
-      };
-      
       if (isEditing && product) {
-        await apiRequest("PUT", `/api/products/${product.id}`, payload);
+        await apiRequest("PUT", `/api/products/${product.id}`, data);
       } else {
-        await apiRequest("POST", "/api/products", payload);
+        await apiRequest("POST", "/api/products", data);
       }
     },
     onSuccess: () => {
@@ -73,15 +62,47 @@ export default function ProductForm({ product, onClose }: ProductFormProps) {
           variant: "destructive",
         });
         setTimeout(() => {
-          window.location.href = "/api/login";
+          window.location.href = "/login";
         }, 500);
         return;
       }
-      toast({
-        title: "Error",
-        description: `Failed to ${isEditing ? "update" : "create"} product`,
-        variant: "destructive",
-      });
+
+      // Attempt to parse server-side validation errors
+      const errorMessage = error.message;
+      const validationPrefix = "Validation Error: ";
+      if (errorMessage.startsWith(validationPrefix)) {
+        const validationErrors = errorMessage.substring(validationPrefix.length).split(', ');
+        validationErrors.forEach(err => {
+          // This is a simplistic parsing. A more robust solution might involve
+          // the server returning a structured error object.
+          // For now, assuming format "field is required" or "field must be type"
+          const parts = err.split(' ');
+          const fieldName = parts[0].toLowerCase(); // e.g., "name", "price"
+
+          // Map common Zod error messages to form fields
+          if (form.getValues().hasOwnProperty(fieldName)) {
+            form.setError(fieldName as keyof FormData, {
+              type: "server",
+              message: err,
+            });
+          } else if (fieldName === 'price' && form.getValues().hasOwnProperty('price')) {
+            form.setError('price', { type: "server", message: err });
+          } else if (fieldName === 'stock' && form.getValues().hasOwnProperty('stock')) {
+            form.setError('stock', { type: "server", message: err });
+          }
+        });
+        toast({
+          title: "Validation Error",
+          description: "Please check the form for errors.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: `Failed to ${isEditing ? "update" : "create"} product: ${error.message}`,
+          variant: "destructive",
+        });
+      }
     },
   });
 
@@ -93,8 +114,8 @@ export default function ProductForm({ product, onClose }: ProductFormProps) {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center space-x-4">
-        <Button variant="outline" onClick={onClose}>
-          <ArrowLeft className="w-4 h-4 mr-2" />
+        <Button variant="outline" onClick={onClose} aria-label="Back to Inventory Table">
+          <ArrowLeft className="w-4 h-4 mr-2" aria-hidden="true" />
           Back
         </Button>
         <h2 className="text-2xl font-bold text-gray-900">
@@ -109,7 +130,7 @@ export default function ProductForm({ product, onClose }: ProductFormProps) {
         </CardHeader>
         <CardContent>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6" aria-label={isEditing ? "Edit Product Form" : "Add New Product Form"}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField
                   control={form.control}
@@ -118,7 +139,7 @@ export default function ProductForm({ product, onClose }: ProductFormProps) {
                     <FormItem>
                       <FormLabel>Product Name</FormLabel>
                       <FormControl>
-                        <Input placeholder="Enter product name" {...field} />
+                        <Input placeholder="Enter product name" {...field} aria-required="true" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -132,7 +153,7 @@ export default function ProductForm({ product, onClose }: ProductFormProps) {
                     <FormItem>
                       <FormLabel>SKU</FormLabel>
                       <FormControl>
-                        <Input placeholder="Enter SKU" {...field} />
+                        <Input placeholder="Enter SKU" {...field} aria-required="true" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -147,7 +168,7 @@ export default function ProductForm({ product, onClose }: ProductFormProps) {
                       <FormLabel>Category</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
-                          <SelectTrigger>
+                          <SelectTrigger aria-label="Select product category">
                             <SelectValue placeholder="Select category" />
                           </SelectTrigger>
                         </FormControl>
@@ -176,6 +197,8 @@ export default function ProductForm({ product, onClose }: ProductFormProps) {
                           step="0.01" 
                           placeholder="0.00" 
                           {...field} 
+                          onChange={e => field.onChange(parseFloat(e.target.value))}
+                          aria-required="true"
                         />
                       </FormControl>
                       <FormMessage />
@@ -194,6 +217,8 @@ export default function ProductForm({ product, onClose }: ProductFormProps) {
                           type="number" 
                           placeholder="0" 
                           {...field} 
+                          onChange={e => field.onChange(parseInt(e.target.value))}
+                          aria-required="true"
                         />
                       </FormControl>
                       <FormMessage />
@@ -209,7 +234,7 @@ export default function ProductForm({ product, onClose }: ProductFormProps) {
                       <FormLabel>Status</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
-                          <SelectTrigger>
+                          <SelectTrigger aria-label="Select product status">
                             <SelectValue />
                           </SelectTrigger>
                         </FormControl>
@@ -235,6 +260,7 @@ export default function ProductForm({ product, onClose }: ProductFormProps) {
                         placeholder="Enter product description" 
                         rows={4}
                         {...field} 
+                        aria-required="true"
                       />
                     </FormControl>
                     <FormMessage />
@@ -243,13 +269,14 @@ export default function ProductForm({ product, onClose }: ProductFormProps) {
               />
 
               <div className="flex justify-end space-x-4">
-                <Button type="button" variant="outline" onClick={onClose}>
+                <Button type="button" variant="outline" onClick={onClose} aria-label="Cancel">
                   Cancel
                 </Button>
                 <Button 
                   type="submit" 
                   disabled={createMutation.isPending}
                   className="bg-primary-500 hover:bg-primary-600"
+                  aria-label={isEditing ? "Update Product" : "Create Product"}
                 >
                   {createMutation.isPending 
                     ? (isEditing ? "Updating..." : "Creating...") 

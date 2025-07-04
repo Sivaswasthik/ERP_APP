@@ -11,15 +11,13 @@ export default function Inventory() {
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
+      // The redirection is now handled by the useAuth hook and App.tsx
+      // No explicit redirection needed here, just a toast notification
       toast({
         title: "Unauthorized",
-        description: "You are logged out. Logging in again...",
+        description: "You are logged out. Please log in.",
         variant: "destructive",
       });
-      setTimeout(() => {
-        window.location.href = "/api/login";
-      }, 500);
-      return;
     }
   }, [isAuthenticated, isLoading, toast]);
 

@@ -1,64 +1,57 @@
 import {
-  users,
-  products,
-  orders,
-  orderItems,
-  employees,
-  transactions,
-  type User,
-  type UpsertUser,
-  type Product,
-  type InsertProduct,
-  type Order,
-  type InsertOrder,
-  type OrderItem,
-  type InsertOrderItem,
-  type Employee,
-  type InsertEmployee,
-  type Transaction,
-  type InsertTransaction,
+  User,
+  Product,
+  Order,
+  OrderItem,
+  Employee,
+  Transaction,
+  IUser,
+  IProduct,
+  IOrder,
+  IOrderItem,
+  IEmployee,
+  ITransaction,
 } from "@shared/schema";
-import { db } from "./db";
-import { eq, desc, like, and } from "drizzle-orm";
+import { Document } from 'mongoose';
+import { ApiError } from './utils/errorHandler';
 
 export interface IStorage {
-  // User operations (mandatory for Replit Auth)
-  getUser(id: string): Promise<User | undefined>;
-  upsertUser(user: UpsertUser): Promise<User>;
+  // User operations
+  getUser(id: string): Promise<IUser | null>;
   
   // Product operations
-  getProducts(): Promise<Product[]>;
-  getProduct(id: number): Promise<Product | undefined>;
-  createProduct(product: InsertProduct): Promise<Product>;
-  updateProduct(id: number, product: Partial<InsertProduct>): Promise<Product>;
-  deleteProduct(id: number): Promise<void>;
-  searchProducts(query: string): Promise<Product[]>;
+  getProducts(): Promise<IProduct[]>;
+  getProduct(id: string): Promise<IProduct | null>;
+  createProduct(product: IProduct): Promise<IProduct>;
+  updateProduct(id: string, product: Partial<IProduct>): Promise<IProduct | null>;
+  deleteProduct(id: string): Promise<void>;
+  searchProducts(query: string): Promise<IProduct[]>;
   
   // Order operations
-  getOrders(): Promise<Order[]>;
-  getOrder(id: number): Promise<Order | undefined>;
-  createOrder(order: InsertOrder): Promise<Order>;
-  updateOrder(id: number, order: Partial<InsertOrder>): Promise<Order>;
-  deleteOrder(id: number): Promise<void>;
+  getOrders(): Promise<IOrder[]>;
+  getOrder(id: string): Promise<IOrder | null>;
+  createOrder(order: IOrder): Promise<IOrder>;
+  updateOrder(id: string, order: Partial<IOrder>): Promise<IOrder | null>;
+  deleteOrder(id: string): Promise<void>;
   
   // Order items operations
-  getOrderItems(orderId: number): Promise<OrderItem[]>;
-  createOrderItem(item: InsertOrderItem): Promise<OrderItem>;
+  getOrderItems(orderId: string): Promise<IOrderItem[]>;
+  createOrderItem(item: IOrderItem): Promise<IOrderItem>;
   
   // Employee operations
-  getEmployees(): Promise<Employee[]>;
-  getEmployee(id: number): Promise<Employee | undefined>;
-  createEmployee(employee: InsertEmployee): Promise<Employee>;
-  updateEmployee(id: number, employee: Partial<InsertEmployee>): Promise<Employee>;
-  deleteEmployee(id: number): Promise<void>;
-  searchEmployees(query: string): Promise<Employee[]>;
+  getEmployees(): Promise<IEmployee[]>;
+  getEmployee(id: string): Promise<IEmployee | null>;
+  createEmployee(employee: IEmployee): Promise<IEmployee>;
+  updateEmployee(id: string, employee: Partial<IEmployee>): Promise<IEmployee | null>;
+  deleteEmployee(id: string): Promise<void>;
+  searchEmployees(query: string): Promise<IEmployee[]>;
   
   // Transaction operations
-  getTransactions(): Promise<Transaction[]>;
-  getTransaction(id: number): Promise<Transaction | undefined>;
-  createTransaction(transaction: InsertTransaction): Promise<Transaction>;
-  updateTransaction(id: number, transaction: Partial<InsertTransaction>): Promise<Transaction>;
-  deleteTransaction(id: number): Promise<void>;
+  getTransactions(): Promise<ITransaction[]>;
+  getTransaction(id: string): Promise<ITransaction | null>;
+  createTransaction(transaction: ITransaction): Promise<ITransaction>;
+  updateTransaction(id: string, transaction: Partial<ITransaction>): Promise<ITransaction | null>;
+  deleteTransaction(id: string): Promise<void>;
   
   // Dashboard KPIs
   getDashboardKPIs(): Promise<{
@@ -71,181 +64,158 @@ export interface IStorage {
 
 export class DatabaseStorage implements IStorage {
   // User operations
-  async getUser(id: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
-    return user;
-  }
-
-  async upsertUser(userData: UpsertUser): Promise<User> {
-    const [user] = await db
-      .insert(users)
-      .values(userData)
-      .onConflictDoUpdate({
-        target: users.id,
-        set: {
-          ...userData,
-          updatedAt: new Date(),
-        },
-      })
-      .returning();
-    return user;
+  async getUser(id: string): Promise<IUser | null> {
+    return await User.findById(id);
   }
 
   // Product operations
-  async getProducts(): Promise<Product[]> {
-    return await db.select().from(products).orderBy(desc(products.createdAt));
+  async getProducts(): Promise<IProduct[]> {
+    return await Product.find().sort({ createdAt: -1 });
   }
 
-  async getProduct(id: number): Promise<Product | undefined> {
-    const [product] = await db.select().from(products).where(eq(products.id, id));
+  async getProduct(id: string): Promise<IProduct | null> {
+    const product = await Product.findById(id);
+    if (!product) {
+      throw new ApiError('Product not found', 404);
+    }
     return product;
   }
 
-  async createProduct(product: InsertProduct): Promise<Product> {
-    const [newProduct] = await db
-      .insert(products)
-      .values({ ...product, updatedAt: new Date() })
-      .returning();
-    return newProduct;
+  async createProduct(productData: IProduct): Promise<IProduct> {
+    const newProduct = new Product(productData);
+    return await newProduct.save();
   }
 
-  async updateProduct(id: number, product: Partial<InsertProduct>): Promise<Product> {
-    const [updatedProduct] = await db
-      .update(products)
-      .set({ ...product, updatedAt: new Date() })
-      .where(eq(products.id, id))
-      .returning();
+  async updateProduct(id: string, productData: Partial<IProduct>): Promise<IProduct | null> {
+    const updatedProduct = await Product.findByIdAndUpdate(id, productData, { new: true });
+    if (!updatedProduct) {
+      throw new ApiError('Product not found for update', 404);
+    }
     return updatedProduct;
   }
 
-  async deleteProduct(id: number): Promise<void> {
-    await db.delete(products).where(eq(products.id, id));
+  async deleteProduct(id: string): Promise<void> {
+    const result = await Product.findByIdAndDelete(id);
+    if (!result) {
+      throw new ApiError('Product not found for deletion', 404);
+    }
   }
 
-  async searchProducts(query: string): Promise<Product[]> {
-    return await db
-      .select()
-      .from(products)
-      .where(
-        like(products.name, `%${query}%`)
-      )
-      .orderBy(desc(products.createdAt));
+  async searchProducts(query: string): Promise<IProduct[]> {
+    return await Product.find({ name: { $regex: query, $options: 'i' } }).sort({ createdAt: -1 });
   }
 
   // Order operations
-  async getOrders(): Promise<Order[]> {
-    return await db.select().from(orders).orderBy(desc(orders.createdAt));
+  async getOrders(): Promise<IOrder[]> {
+    return await Order.find().sort({ createdAt: -1 });
   }
 
-  async getOrder(id: number): Promise<Order | undefined> {
-    const [order] = await db.select().from(orders).where(eq(orders.id, id));
+  async getOrder(id: string): Promise<IOrder | null> {
+    const order = await Order.findById(id);
+    if (!order) {
+      throw new ApiError('Order not found', 404);
+    }
     return order;
   }
 
-  async createOrder(order: InsertOrder): Promise<Order> {
-    const [newOrder] = await db
-      .insert(orders)
-      .values({ ...order, updatedAt: new Date() })
-      .returning();
-    return newOrder;
+  async createOrder(orderData: IOrder): Promise<IOrder> {
+    const newOrder = new Order(orderData);
+    return await newOrder.save();
   }
 
-  async updateOrder(id: number, order: Partial<InsertOrder>): Promise<Order> {
-    const [updatedOrder] = await db
-      .update(orders)
-      .set({ ...order, updatedAt: new Date() })
-      .where(eq(orders.id, id))
-      .returning();
+  async updateOrder(id: string, orderData: Partial<IOrder>): Promise<IOrder | null> {
+    const updatedOrder = await Order.findByIdAndUpdate(id, orderData, { new: true });
+    if (!updatedOrder) {
+      throw new ApiError('Order not found for update', 404);
+    }
     return updatedOrder;
   }
 
-  async deleteOrder(id: number): Promise<void> {
-    await db.delete(orders).where(eq(orders.id, id));
+  async deleteOrder(id: string): Promise<void> {
+    const result = await Order.findByIdAndDelete(id);
+    if (!result) {
+      throw new ApiError('Order not found for deletion', 404);
+    }
   }
 
   // Order items operations
-  async getOrderItems(orderId: number): Promise<OrderItem[]> {
-    return await db.select().from(orderItems).where(eq(orderItems.orderId, orderId));
+  async getOrderItems(orderId: string): Promise<IOrderItem[]> {
+    return await OrderItem.find({ orderId });
   }
 
-  async createOrderItem(item: InsertOrderItem): Promise<OrderItem> {
-    const [newItem] = await db
-      .insert(orderItems)
-      .values(item)
-      .returning();
-    return newItem;
+  async createOrderItem(itemData: IOrderItem): Promise<IOrderItem> {
+    const newItem = new OrderItem(itemData);
+    return await newItem.save();
   }
 
   // Employee operations
-  async getEmployees(): Promise<Employee[]> {
-    return await db.select().from(employees).orderBy(desc(employees.createdAt));
+  async getEmployees(): Promise<IEmployee[]> {
+    return await Employee.find().sort({ createdAt: -1 });
   }
 
-  async getEmployee(id: number): Promise<Employee | undefined> {
-    const [employee] = await db.select().from(employees).where(eq(employees.id, id));
+  async getEmployee(id: string): Promise<IEmployee | null> {
+    const employee = await Employee.findById(id);
+    if (!employee) {
+      throw new ApiError('Employee not found', 404);
+    }
     return employee;
   }
 
-  async createEmployee(employee: InsertEmployee): Promise<Employee> {
-    const [newEmployee] = await db
-      .insert(employees)
-      .values({ ...employee, updatedAt: new Date() })
-      .returning();
-    return newEmployee;
+  async createEmployee(employeeData: IEmployee): Promise<IEmployee> {
+    const newEmployee = new Employee(employeeData);
+    return await newEmployee.save();
   }
 
-  async updateEmployee(id: number, employee: Partial<InsertEmployee>): Promise<Employee> {
-    const [updatedEmployee] = await db
-      .update(employees)
-      .set({ ...employee, updatedAt: new Date() })
-      .where(eq(employees.id, id))
-      .returning();
+  async updateEmployee(id: string, employeeData: Partial<IEmployee>): Promise<IEmployee | null> {
+    const updatedEmployee = await Employee.findByIdAndUpdate(id, employeeData, { new: true });
+    if (!updatedEmployee) {
+      throw new ApiError('Employee not found for update', 404);
+    }
     return updatedEmployee;
   }
 
-  async deleteEmployee(id: number): Promise<void> {
-    await db.delete(employees).where(eq(employees.id, id));
+  async deleteEmployee(id: string): Promise<void> {
+    const result = await Employee.findByIdAndDelete(id);
+    if (!result) {
+      throw new ApiError('Employee not found for deletion', 404);
+    }
   }
 
-  async searchEmployees(query: string): Promise<Employee[]> {
-    return await db
-      .select()
-      .from(employees)
-      .where(
-        like(employees.firstName, `%${query}%`)
-      )
-      .orderBy(desc(employees.createdAt));
+  async searchEmployees(query: string): Promise<IEmployee[]> {
+    return await Employee.find({ firstName: { $regex: query, $options: 'i' } }).sort({ createdAt: -1 });
   }
 
   // Transaction operations
-  async getTransactions(): Promise<Transaction[]> {
-    return await db.select().from(transactions).orderBy(desc(transactions.date));
+  async getTransactions(): Promise<ITransaction[]> {
+    return await Transaction.find().sort({ date: -1 });
   }
 
-  async getTransaction(id: number): Promise<Transaction | undefined> {
-    const [transaction] = await db.select().from(transactions).where(eq(transactions.id, id));
+  async getTransaction(id: string): Promise<ITransaction | null> {
+    const transaction = await Transaction.findById(id);
+    if (!transaction) {
+      throw new ApiError('Transaction not found', 404);
+    }
     return transaction;
   }
 
-  async createTransaction(transaction: InsertTransaction): Promise<Transaction> {
-    const [newTransaction] = await db
-      .insert(transactions)
-      .values({ ...transaction, updatedAt: new Date() })
-      .returning();
-    return newTransaction;
+  async createTransaction(transactionData: ITransaction): Promise<ITransaction> {
+    const newTransaction = new Transaction(transactionData);
+    return await newTransaction.save();
   }
 
-  async updateTransaction(id: number, transaction: Partial<InsertTransaction>): Promise<Transaction> {
-    const [updatedTransaction] = await db
-      .update(transactions)
-      .set({ ...transaction, updatedAt: new Date() })
-      .where(eq(transactions.id, id))
-      .returning();
+  async updateTransaction(id: string, transactionData: Partial<ITransaction>): Promise<ITransaction | null> {
+    const updatedTransaction = await Transaction.findByIdAndUpdate(id, transactionData, { new: true });
+    if (!updatedTransaction) {
+      throw new ApiError('Transaction not found for update', 404);
+    }
     return updatedTransaction;
   }
 
-  async deleteTransaction(id: number): Promise<void> {
-    await db.delete(transactions).where(eq(transactions.id, id));
+  async deleteTransaction(id: string): Promise<void> {
+    const result = await Transaction.findByIdAndDelete(id);
+    if (!result) {
+      throw new ApiError('Transaction not found for deletion', 404);
+    }
   }
 
   // Dashboard KPIs
@@ -255,34 +225,18 @@ export class DatabaseStorage implements IStorage {
     inventoryItems: number;
     employees: number;
   }> {
-    const [revenueResult] = await db
-      .select({
-        total: transactions.amount,
-      })
-      .from(transactions)
-      .where(eq(transactions.type, "income"));
+    const incomeTransactions = await Transaction.find({ type: "income" });
+    const totalRevenue = incomeTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
 
-    const [ordersResult] = await db
-      .select()
-      .from(orders)
-      .where(eq(orders.status, "pending"));
-
-    const allProducts = await db.select().from(products);
-    const allEmployees = await db.select().from(employees);
-
-    // Calculate total revenue from income transactions
-    const allIncomeTransactions = await db
-      .select()
-      .from(transactions)
-      .where(eq(transactions.type, "income"));
-    
-    const totalRevenue = allIncomeTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
+    const activeOrders = await Order.countDocuments({ status: "pending" });
+    const inventoryItems = await Product.countDocuments();
+    const employees = await Employee.countDocuments();
 
     return {
       totalRevenue,
-      activeOrders: ordersResult.length,
-      inventoryItems: allProducts.length,
-      employees: allEmployees.length,
+      activeOrders,
+      inventoryItems,
+      employees,
     };
   }
 }

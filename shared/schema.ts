@@ -1,164 +1,183 @@
-import {
-  pgTable,
-  text,
-  varchar,
-  timestamp,
-  jsonb,
-  index,
-  serial,
-  integer,
-  decimal,
-  boolean,
-} from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
-import { z } from "zod";
-import { relations } from "drizzle-orm";
+import { Schema, model, Document } from 'mongoose';
 
-// Session storage table (Required for Replit Auth)
-export const sessions = pgTable(
-  "sessions",
-  {
-    sid: varchar("sid").primaryKey(),
-    sess: jsonb("sess").notNull(),
-    expire: timestamp("expire").notNull(),
-  },
-  (table) => [index("IDX_session_expire").on(table.expire)],
-);
+export interface IUser extends Document {
+  email: string;
+  password?: string; // Password can be optional for certain operations (e.g., fetching user without password)
+  firstName?: string;
+  lastName?: string;
+  profileImageUrl?: string;
+  role: 'admin' | 'manager' | 'staff';
+  createdAt?: Date;
+  updatedAt?: Date;
+}
 
-// User storage table (Required for Replit Auth)
-export const users = pgTable("users", {
-  id: varchar("id").primaryKey().notNull(),
-  email: varchar("email").unique(),
-  firstName: varchar("first_name"),
-  lastName: varchar("last_name"),
-  profileImageUrl: varchar("profile_image_url"),
-  role: varchar("role").notNull().default("staff"), // admin, manager, staff
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
+export interface IProduct extends Document {
+  name: string;
+  description?: string;
+  sku: string;
+  category: string;
+  price: number;
+  stock: number;
+  status: 'active' | 'discontinued';
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export interface IOrder extends Document {
+  orderNumber: string;
+  customerName: string;
+  customerEmail?: string;
+  totalAmount: number;
+  status: 'pending' | 'processing' | 'completed' | 'cancelled';
+  type: 'sale' | 'purchase';
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export interface IOrderItem extends Document {
+  orderId: Schema.Types.ObjectId;
+  productId: Schema.Types.ObjectId;
+  quantity: number;
+  unitPrice: number;
+  totalPrice: number;
+}
+
+export interface IEmployee extends Document {
+  employeeId: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  position: string;
+  department: string;
+  salary?: number;
+  hireDate: Date;
+  status: 'active' | 'on_leave' | 'terminated';
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export interface ITransaction extends Document {
+  description: string;
+  amount: number;
+  type: 'income' | 'expense' | 'transfer';
+  category: string;
+  date: Date;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+const userSchema = new Schema<IUser>({
+  email: { type: String, required: true, unique: true },
+  password: { type: String, required: false },
+  firstName: { type: String },
+  lastName: { type: String },
+  profileImageUrl: { type: String },
+  role: { type: String, enum: ['admin', 'manager', 'staff'], default: 'staff' },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
 });
 
-// Inventory Management
-export const products = pgTable("products", {
-  id: serial("id").primaryKey(),
-  name: varchar("name", { length: 255 }).notNull(),
-  description: text("description"),
-  sku: varchar("sku", { length: 100 }).unique().notNull(),
-  category: varchar("category", { length: 100 }).notNull(),
-  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
-  stock: integer("stock").notNull().default(0),
-  status: varchar("status").notNull().default("active"), // active, discontinued
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
+const productSchema = new Schema<IProduct>({
+  name: { type: String, required: true },
+  description: { type: String },
+  sku: { type: String, required: true, unique: true },
+  category: { type: String, required: true },
+  price: { type: Number, required: true },
+  stock: { type: Number, required: true, default: 0 },
+  status: { type: String, enum: ['active', 'discontinued'], default: 'active' },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
 });
 
-// Sales & Purchases
-export const orders = pgTable("orders", {
-  id: serial("id").primaryKey(),
-  orderNumber: varchar("order_number", { length: 50 }).unique().notNull(),
-  customerName: varchar("customer_name", { length: 255 }).notNull(),
-  customerEmail: varchar("customer_email", { length: 255 }),
-  totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
-  status: varchar("status").notNull().default("pending"), // pending, processing, completed, cancelled
-  type: varchar("type").notNull().default("sale"), // sale, purchase
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
+const orderSchema = new Schema<IOrder>({
+  orderNumber: { type: String, required: true, unique: true },
+  customerName: { type: String, required: true },
+  customerEmail: { type: String },
+  totalAmount: { type: Number, required: true },
+  status: { type: String, enum: ['pending', 'processing', 'completed', 'cancelled'], default: 'pending' },
+  type: { type: String, enum: ['sale', 'purchase'], default: 'sale' },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
 });
 
-export const orderItems = pgTable("order_items", {
-  id: serial("id").primaryKey(),
-  orderId: integer("order_id").notNull().references(() => orders.id),
-  productId: integer("product_id").notNull().references(() => products.id),
-  quantity: integer("quantity").notNull(),
-  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
-  totalPrice: decimal("total_price", { precision: 10, scale: 2 }).notNull(),
+const orderItemSchema = new Schema<IOrderItem>({
+  orderId: { type: Schema.Types.ObjectId, ref: 'Order', required: true },
+  productId: { type: Schema.Types.ObjectId, ref: 'Product', required: true },
+  quantity: { type: Number, required: true },
+  unitPrice: { type: Number, required: true },
+  totalPrice: { type: Number, required: true },
 });
 
-// Human Resources
-export const employees = pgTable("employees", {
-  id: serial("id").primaryKey(),
-  employeeId: varchar("employee_id", { length: 50 }).unique().notNull(),
-  firstName: varchar("first_name", { length: 100 }).notNull(),
-  lastName: varchar("last_name", { length: 100 }).notNull(),
-  email: varchar("email", { length: 255 }).unique().notNull(),
-  position: varchar("position", { length: 255 }).notNull(),
-  department: varchar("department", { length: 100 }).notNull(),
-  salary: decimal("salary", { precision: 10, scale: 2 }),
-  hireDate: timestamp("hire_date").notNull(),
-  status: varchar("status").notNull().default("active"), // active, on_leave, terminated
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
+const employeeSchema = new Schema<IEmployee>({
+  employeeId: { type: String, required: true, unique: true },
+  firstName: { type: String, required: true },
+  lastName: { type: String, required: true },
+  email: { type: String, required: true, unique: true },
+  position: { type: String, required: true },
+  department: { type: String, required: true },
+  salary: { type: Number },
+  hireDate: { type: Date, required: true },
+  status: { type: String, enum: ['active', 'on_leave', 'terminated'], default: 'active' },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
 });
 
-// Finance
-export const transactions = pgTable("transactions", {
-  id: serial("id").primaryKey(),
-  description: varchar("description", { length: 255 }).notNull(),
-  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
-  type: varchar("type").notNull(), // income, expense, transfer
-  category: varchar("category", { length: 100 }).notNull(),
-  date: timestamp("date").notNull(),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
+const transactionSchema = new Schema<ITransaction>({
+  description: { type: String, required: true },
+  amount: { type: Number, required: true },
+  type: { type: String, enum: ['income', 'expense', 'transfer'], required: true },
+  category: { type: String, required: true },
+  date: { type: Date, required: true },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
 });
 
-// Relations
-export const ordersRelations = relations(orders, ({ many }) => ({
-  items: many(orderItems),
-}));
+import { z } from 'zod';
 
-export const orderItemsRelations = relations(orderItems, ({ one }) => ({
-  order: one(orders, {
-    fields: [orderItems.orderId],
-    references: [orders.id],
-  }),
-  product: one(products, {
-    fields: [orderItems.productId],
-    references: [products.id],
-  }),
-}));
+export const User = model<IUser>('User', userSchema);
+export const Product = model<IProduct>('Product', productSchema);
+export const Order = model<IOrder>('Order', orderSchema);
+export const OrderItem = model<IOrderItem>('OrderItem', orderItemSchema);
+export const Employee = model<IEmployee>('Employee', employeeSchema);
+export const Transaction = model<ITransaction>('Transaction', transactionSchema);
 
-export const productsRelations = relations(products, ({ many }) => ({
-  orderItems: many(orderItems),
-}));
-
-// Types
-export type UpsertUser = typeof users.$inferInsert;
-export type User = typeof users.$inferSelect;
-
-export type Product = typeof products.$inferSelect;
-export type InsertProduct = typeof products.$inferInsert;
-export const insertProductSchema = createInsertSchema(products).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
+// Zod Schemas for validation
+export const insertProductSchema = z.object({
+  name: z.string().min(1, "Product name is required"),
+  description: z.string().optional(),
+  sku: z.string().min(1, "SKU is required"),
+  category: z.string().min(1, "Category is required"),
+  price: z.number().positive("Price must be a positive number"),
+  stock: z.number().int().min(0, "Stock cannot be negative"),
+  status: z.enum(['active', 'discontinued']).default('active'),
+  imageUrl: z.string().url("Invalid image URL").optional(),
 });
 
-export type Order = typeof orders.$inferSelect;
-export type InsertOrder = typeof orders.$inferInsert;
-export const insertOrderSchema = createInsertSchema(orders).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
+export const insertOrderSchema = z.object({
+  orderNumber: z.string().min(1, "Order number is required"),
+  customerName: z.string().min(1, "Customer name is required"),
+  customerEmail: z.string().email("Invalid email address").optional(),
+  totalAmount: z.number().positive("Total amount must be positive"),
+  status: z.enum(['pending', 'processing', 'completed', 'cancelled']).default('pending'),
+  type: z.enum(['sale', 'purchase']).default('sale'),
 });
 
-export type OrderItem = typeof orderItems.$inferSelect;
-export type InsertOrderItem = typeof orderItems.$inferInsert;
-export const insertOrderItemSchema = createInsertSchema(orderItems).omit({
-  id: true,
+export const insertEmployeeSchema = z.object({
+  employeeId: z.string().min(1, "Employee ID is required"),
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
+  email: z.string().email("Invalid email address"),
+  position: z.string().min(1, "Position is required"),
+  department: z.string().min(1, "Department is required"),
+  salary: z.number().positive("Salary must be a positive number").optional(),
+  hireDate: z.string().transform((str) => new Date(str)), // Assuming date comes as string
+  status: z.enum(['active', 'on_leave', 'terminated']).default('active'),
 });
 
-export type Employee = typeof employees.$inferSelect;
-export type InsertEmployee = typeof employees.$inferInsert;
-export const insertEmployeeSchema = createInsertSchema(employees).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export type Transaction = typeof transactions.$inferSelect;
-export type InsertTransaction = typeof transactions.$inferInsert;
-export const insertTransactionSchema = createInsertSchema(transactions).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
+export const insertTransactionSchema = z.object({
+  description: z.string().min(1, "Description is required"),
+  amount: z.number().positive("Amount must be a positive number"),
+  type: z.enum(['income', 'expense', 'transfer']),
+  category: z.string().min(1, "Category is required"),
+  date: z.string().transform((str) => new Date(str)), // Assuming date comes as string
 });

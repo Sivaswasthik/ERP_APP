@@ -21,8 +21,10 @@ export default function Sidebar() {
   const { user } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
+  const { logout } = useAuth(); // Import useAuth and get logout function
+
   const handleLogout = () => {
-    window.location.href = "/api/logout";
+    logout(); // Use the logout function from useAuth
   };
 
   const toggleMobileMenu = () => {
@@ -61,7 +63,7 @@ export default function Sidebar() {
           className="fixed inset-0 bg-black bg-opacity-50 z-20 lg:hidden"
           onClick={toggleMobileMenu}
         />
-      )}
+      )} 
 
       {/* Sidebar */}
       <div className={`fixed inset-y-0 left-0 z-30 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 ${
@@ -70,7 +72,7 @@ export default function Sidebar() {
         {/* Sidebar Header */}
         <div className="flex items-center justify-between h-16 px-6 bg-primary-500 text-white">
           <div className="flex items-center">
-            <Building className="text-xl mr-3" />
+            <Building className="text-xl mr-3" aria-hidden="true" />
             <span className="text-lg font-semibold">ERP System</span>
           </div>
         </div>
@@ -78,7 +80,7 @@ export default function Sidebar() {
         {/* User Profile Section */}
         <div className="p-4 border-b border-gray-200">
           <div className="flex items-center">
-            <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center" aria-hidden="true">
               <span className="text-primary-600 font-medium">
                 {user?.firstName?.[0]}{user?.lastName?.[0]}
               </span>
@@ -93,7 +95,7 @@ export default function Sidebar() {
         </div>
 
         {/* Navigation Menu */}
-        <nav className="flex-1 px-4 py-6 space-y-2">
+        <nav className="flex-1 px-4 py-6 space-y-2" aria-label="Main navigation">
           {filteredNavItems.map((item) => {
             const Icon = item.icon;
             const isActive = location === item.path;
@@ -107,8 +109,9 @@ export default function Sidebar() {
                       : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                   }`}
                   onClick={() => setIsMobileMenuOpen(false)}
+                  aria-current={isActive ? "page" : undefined}
                 >
-                  <Icon className="w-5 h-5 mr-3" />
+                  <Icon className="w-5 h-5 mr-3" aria-hidden="true" />
                   {item.label}
                 </a>
               </Link>
@@ -122,8 +125,9 @@ export default function Sidebar() {
             onClick={handleLogout}
             variant="outline"
             className="w-full flex items-center justify-center text-red-600 border-red-200 hover:bg-red-50"
+            aria-label="Logout"
           >
-            <LogOut className="w-4 h-4 mr-2" />
+            <LogOut className="w-4 h-4 mr-2" aria-hidden="true" />
             Logout
           </Button>
         </div>

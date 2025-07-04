@@ -3,7 +3,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { DollarSign, ShoppingCart, Package, Users, TrendingUp, TrendingDown } from "lucide-react";
 
 export default function KPICards() {
-  const { data: kpis, isLoading } = useQuery({
+  interface KPIResponse {
+    totalRevenue: number;
+    activeOrders: number;
+    inventoryItems: number;
+    employees: number;
+  }
+
+  const { data: kpis, isLoading } = useQuery<KPIResponse>({
     queryKey: ["/api/dashboard/kpis"],
   });
 
@@ -76,13 +83,13 @@ export default function KPICards() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">{card.title}</p>
-                  <p className="text-2xl font-bold text-gray-900">{card.value}</p>
+                  <p className="text-2xl font-bold text-gray-900" aria-live="polite">{card.value}</p>
                   <p className={`text-sm mt-1 flex items-center ${card.trendColor}`}>
-                    <Trend className="w-3 h-3 mr-1" />
-                    {card.change}
+                    <Trend className="w-3 h-3 mr-1" aria-hidden="true" />
+                    <span className="sr-only">Change: </span>{card.change}
                   </p>
                 </div>
-                <div className={`w-12 h-12 ${card.iconBg} rounded-lg flex items-center justify-center`}>
+                <div className={`w-12 h-12 ${card.iconBg} rounded-lg flex items-center justify-center`} aria-hidden="true">
                   <Icon className={`${card.iconColor} text-xl`} />
                 </div>
               </div>

@@ -1,9 +1,31 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
+import { connectDB } from "./db";
+import swaggerUi from 'swagger-ui-express';
+import swaggerSpecs from './swagger';
+import { errorHandler, ApiError } from './utils/errorHandler';
+import cors from 'cors';
 
 const app = express();
 app.use(express.json());
+app.use(cors({
+  origin: 'http://localhost:5173', // Allow requests from your client-side application
+  credentials: true, // Allow cookies to be sent with requests
+}));
+
+// Serve Swagger UI
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpecs));
+
+export function log(message: string, source = "express") {
+  const formattedTime = new Date().toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+  });
+
+  console.log(`${formattedTime} [${source}] ${message}`);
+}
 app.use(express.urlencoded({ extended: false }));
 
 app.use((req, res, next) => {
@@ -37,34 +59,24 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  await connectDB();
   const server = await registerRoutes(app);
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
+  app.use(errorHandler);
 
-    res.status(status).json({ message });
-    throw err;
-  });
-
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
-    await setupVite(app, server);
-  } else {
-    serveStatic(app);
-  }
-
-  // ALWAYS serve the app on port 5000
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = 5000;
+  // The server will now only serve the API. The client will be served separately.
+  const port = 5001; // Changed port from 5000 to 5001
   server.listen({
     port,
-    host: "0.0.0.0",
-    reusePort: true,
+    host: "127.0.0.1",
   }, () => {
-    log(`serving on port ${port}`);
+    log(`API serving on port ${port}`);
   });
 })();
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (err: Error, promise: Promise<any>) => {
+  console.error(`Error: ${err.message}`);
+  // Close server & exit process
+  process.exit(1);
+});

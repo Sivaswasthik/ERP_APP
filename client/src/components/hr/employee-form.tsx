@@ -10,18 +10,13 @@ import { ArrowLeft } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
-import { insertEmployeeSchema, type Employee } from "@shared/schema";
+import { insertEmployeeSchema, type IEmployee } from "@shared/schema";
 import { z } from "zod";
 
-const formSchema = insertEmployeeSchema.extend({
-  salary: z.string().optional(),
-  hireDate: z.string().min(1, "Hire date is required"),
-});
-
-type FormData = z.infer<typeof formSchema>;
+type FormData = z.infer<typeof insertEmployeeSchema>;
 
 interface EmployeeFormProps {
-  employee?: Employee | null;
+  employee?: IEmployee | null;
   onClose: () => void;
 }
 
@@ -30,7 +25,7 @@ export default function EmployeeForm({ employee, onClose }: EmployeeFormProps) {
   const isEditing = !!employee;
 
   const form = useForm<FormData>({
-    resolver: zodResolver(formSchema),
+    resolver: zodResolver(insertEmployeeSchema),
     defaultValues: {
       employeeId: employee?.employeeId || `EMP-${Date.now()}`,
       firstName: employee?.firstName || "",
@@ -38,24 +33,18 @@ export default function EmployeeForm({ employee, onClose }: EmployeeFormProps) {
       email: employee?.email || "",
       position: employee?.position || "",
       department: employee?.department || "",
-      salary: employee?.salary?.toString() || "",
-      hireDate: employee?.hireDate ? new Date(employee.hireDate).toISOString().split('T')[0] : "",
+      salary: employee?.salary || undefined,
+      hireDate: employee?.hireDate ? new Date(employee.hireDate) : new Date(),
       status: employee?.status || "active",
     },
   });
 
   const createMutation = useMutation({
     mutationFn: async (data: FormData) => {
-      const payload = {
-        ...data,
-        salary: data.salary ? data.salary : undefined,
-        hireDate: new Date(data.hireDate),
-      };
-      
       if (isEditing && employee) {
-        await apiRequest("PUT", `/api/employees/${employee.id}`, payload);
+        await apiRequest("PUT", `/api/employees/${employee.id}`, data);
       } else {
-        await apiRequest("POST", "/api/employees", payload);
+        await apiRequest("POST", "/api/employees", data);
       }
     },
     onSuccess: () => {
@@ -74,15 +63,42 @@ export default function EmployeeForm({ employee, onClose }: EmployeeFormProps) {
           variant: "destructive",
         });
         setTimeout(() => {
-          window.location.href = "/api/login";
+          window.location.href = "/login";
         }, 500);
         return;
       }
-      toast({
-        title: "Error",
-        description: `Failed to ${isEditing ? "update" : "create"} employee`,
-        variant: "destructive",
-      });
+
+      const errorMessage = error.message;
+      const validationPrefix = "Validation Error: ";
+      if (errorMessage.startsWith(validationPrefix)) {
+        const validationErrors = errorMessage.substring(validationPrefix.length).split(', ');
+        validationErrors.forEach(err => {
+          const parts = err.split(' ');
+          const fieldName = parts[0].toLowerCase();
+
+          if (form.getValues().hasOwnProperty(fieldName)) {
+            form.setError(fieldName as keyof FormData, {
+              type: "server",
+              message: err,
+            });
+          } else if (fieldName === 'hiredate' && form.getValues().hasOwnProperty('hireDate')) {
+            form.setError('hireDate', { type: "server", message: err });
+          } else if (fieldName === 'salary' && form.getValues().hasOwnProperty('salary')) {
+            form.setError('salary', { type: "server", message: err });
+          }
+        });
+        toast({
+          title: "Validation Error",
+          description: "Please check the form for errors.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: `Failed to ${isEditing ? "update" : "create"} employee: ${error.message}`,
+          variant: "destructive",
+        });
+      }
     },
   });
 
@@ -94,8 +110,8 @@ export default function EmployeeForm({ employee, onClose }: EmployeeFormProps) {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center space-x-4">
-        <Button variant="outline" onClick={onClose}>
-          <ArrowLeft className="w-4 h-4 mr-2" />
+        <Button variant="outline" onClick={onClose} aria-label="Back to Employee Table">
+          <ArrowLeft className="w-4 h-4 mr-2" aria-hidden="true" />
           Back
         </Button>
         <h2 className="text-2xl font-bold text-gray-900">
@@ -110,7 +126,7 @@ export default function EmployeeForm({ employee, onClose }: EmployeeFormProps) {
         </CardHeader>
         <CardContent>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6" aria-label={isEditing ? "Edit Employee Form" : "Add New Employee Form"}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField
                   control={form.control}
@@ -119,7 +135,7 @@ export default function EmployeeForm({ employee, onClose }: EmployeeFormProps) {
                     <FormItem>
                       <FormLabel>Employee ID</FormLabel>
                       <FormControl>
-                        <Input placeholder="Enter employee ID" {...field} />
+                        <Input placeholder="Enter employee ID" {...field} aria-required="true" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -134,7 +150,7 @@ export default function EmployeeForm({ employee, onClose }: EmployeeFormProps) {
                       <FormLabel>Status</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
-                          <SelectTrigger>
+                          <SelectTrigger aria-label="Select employee status">
                             <SelectValue />
                           </SelectTrigger>
                         </FormControl>
@@ -156,7 +172,7 @@ export default function EmployeeForm({ employee, onClose }: EmployeeFormProps) {
                     <FormItem>
                       <FormLabel>First Name</FormLabel>
                       <FormControl>
-                        <Input placeholder="Enter first name" {...field} />
+                        <Input placeholder="Enter first name" {...field} aria-required="true" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -170,7 +186,7 @@ export default function EmployeeForm({ employee, onClose }: EmployeeFormProps) {
                     <FormItem>
                       <FormLabel>Last Name</FormLabel>
                       <FormControl>
-                        <Input placeholder="Enter last name" {...field} />
+                        <Input placeholder="Enter last name" {...field} aria-required="true" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -188,6 +204,7 @@ export default function EmployeeForm({ employee, onClose }: EmployeeFormProps) {
                           type="email" 
                           placeholder="Enter email address" 
                           {...field} 
+                          aria-required="true"
                         />
                       </FormControl>
                       <FormMessage />
@@ -202,7 +219,7 @@ export default function EmployeeForm({ employee, onClose }: EmployeeFormProps) {
                     <FormItem>
                       <FormLabel>Position</FormLabel>
                       <FormControl>
-                        <Input placeholder="Enter position" {...field} />
+                        <Input placeholder="Enter position" {...field} aria-required="true" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -217,7 +234,7 @@ export default function EmployeeForm({ employee, onClose }: EmployeeFormProps) {
                       <FormLabel>Department</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
-                          <SelectTrigger>
+                          <SelectTrigger aria-label="Select department">
                             <SelectValue placeholder="Select department" />
                           </SelectTrigger>
                         </FormControl>
@@ -247,6 +264,9 @@ export default function EmployeeForm({ employee, onClose }: EmployeeFormProps) {
                           step="0.01" 
                           placeholder="0.00" 
                           {...field} 
+                          value={field.value ?? ''} // Handle undefined for optional number input
+                          onChange={e => field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)}
+                          aria-label="Employee Salary"
                         />
                       </FormControl>
                       <FormMessage />
@@ -264,6 +284,9 @@ export default function EmployeeForm({ employee, onClose }: EmployeeFormProps) {
                         <Input 
                           type="date" 
                           {...field} 
+                          value={field.value ? field.value.toISOString().split('T')[0] : ''}
+                          onChange={e => field.onChange(new Date(e.target.value))}
+                          aria-required="true"
                         />
                       </FormControl>
                       <FormMessage />
@@ -273,13 +296,14 @@ export default function EmployeeForm({ employee, onClose }: EmployeeFormProps) {
               </div>
 
               <div className="flex justify-end space-x-4">
-                <Button type="button" variant="outline" onClick={onClose}>
+                <Button type="button" variant="outline" onClick={onClose} aria-label="Cancel">
                   Cancel
                 </Button>
                 <Button 
                   type="submit" 
                   disabled={createMutation.isPending}
                   className="bg-primary-500 hover:bg-primary-600"
+                  aria-label={isEditing ? "Update Employee" : "Create Employee"}
                 >
                   {createMutation.isPending 
                     ? (isEditing ? "Updating..." : "Creating...") 

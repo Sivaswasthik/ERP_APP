@@ -42,8 +42,9 @@ export default function QuickActions() {
                 variant="outline"
                 className="flex flex-col items-center p-4 h-auto bg-gray-50 hover:bg-gray-100 transition duration-200"
                 onClick={action.onClick}
+                aria-label={action.label}
               >
-                <Icon className="text-primary-600 text-2xl mb-2" />
+                <Icon className="text-primary-600 text-2xl mb-2" aria-hidden="true" />
                 <span className="text-sm font-medium text-gray-900">{action.label}</span>
               </Button>
             );

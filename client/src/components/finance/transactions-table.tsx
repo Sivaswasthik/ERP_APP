@@ -11,14 +11,14 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import TransactionForm from "./transaction-form";
-import type { Transaction } from "@shared/schema";
+import { Transaction as TransactionType } from "@shared/schema";
 
 export default function TransactionsTable() {
   const [showTransactionForm, setShowTransactionForm] = useState(false);
-  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  const [editingTransaction, setEditingTransaction] = useState<TransactionType | null>(null);
   const { toast } = useToast();
 
-  const { data: transactions, isLoading } = useQuery<Transaction[]>({
+  const { data: transactions, isLoading } = useQuery<TransactionType[]>({
     queryKey: ["/api/transactions"],
   });
 
@@ -66,7 +66,7 @@ export default function TransactionsTable() {
     }
   };
 
-  const handleEdit = (transaction: Transaction) => {
+  const handleEdit = (transaction: TransactionType) => {
     setEditingTransaction(transaction);
     setShowTransactionForm(true);
   };
@@ -108,8 +108,9 @@ export default function TransactionsTable() {
         <Button 
           onClick={() => setShowTransactionForm(true)}
           className="mt-4 sm:mt-0 bg-primary-500 hover:bg-primary-600"
+          aria-label="Add New Transaction"
         >
-          <Plus className="w-4 h-4 mr-2" />
+          <Plus className="w-4 h-4 mr-2" aria-hidden="true" />
           Add Transaction
         </Button>
       </div>
@@ -121,13 +122,13 @@ export default function TransactionsTable() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Total Revenue</p>
-                <p className="text-2xl font-bold text-gray-900">${totalRevenue.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-gray-900" aria-live="polite">${totalRevenue.toLocaleString()}</p>
                 <p className="text-sm text-green-600 mt-1 flex items-center">
-                  <TrendingUp className="w-3 h-3 mr-1" />
+                  <TrendingUp className="w-3 h-3 mr-1" aria-hidden="true" />
                   {revenueChange} from last month
                 </p>
               </div>
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center" aria-hidden="true">
                 <ArrowUp className="text-green-600 text-xl" />
               </div>
             </div>
@@ -139,13 +140,13 @@ export default function TransactionsTable() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Total Expenses</p>
-                <p className="text-2xl font-bold text-gray-900">${totalExpenses.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-gray-900" aria-live="polite">${totalExpenses.toLocaleString()}</p>
                 <p className="text-sm text-red-600 mt-1 flex items-center">
-                  <TrendingUp className="w-3 h-3 mr-1" />
+                  <TrendingUp className="w-3 h-3 mr-1" aria-hidden="true" />
                   {expenseChange} from last month
                 </p>
               </div>
-              <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
+              <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center" aria-hidden="true">
                 <ArrowDown className="text-red-600 text-xl" />
               </div>
             </div>
@@ -157,13 +158,13 @@ export default function TransactionsTable() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Net Profit</p>
-                <p className="text-2xl font-bold text-gray-900">${netProfit.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-gray-900" aria-live="polite">${netProfit.toLocaleString()}</p>
                 <p className="text-sm text-green-600 mt-1 flex items-center">
-                  <TrendingUp className="w-3 h-3 mr-1" />
+                  <TrendingUp className="w-3 h-3 mr-1" aria-hidden="true" />
                   {profitChange} from last month
                 </p>
               </div>
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center" aria-hidden="true">
                 <PieChart className="text-blue-600 text-xl" />
               </div>
             </div>
@@ -175,10 +176,10 @@ export default function TransactionsTable() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Cash Flow</p>
-                <p className="text-2xl font-bold text-gray-900">${cashFlow.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-gray-900" aria-live="polite">${cashFlow.toLocaleString()}</p>
                 <p className="text-sm text-gray-600 mt-1">Available balance</p>
               </div>
-              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center" aria-hidden="true">
                 <Wallet className="text-purple-600 text-xl" />
               </div>
             </div>
@@ -192,7 +193,7 @@ export default function TransactionsTable() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
             <CardTitle>Recent Transactions</CardTitle>
             <div className="flex space-x-3 mt-4 sm:mt-0">
-              <Select>
+              <Select aria-label="Filter transactions by type">
                 <SelectTrigger className="w-32">
                   <SelectValue placeholder="All Types" />
                 </SelectTrigger>
@@ -206,28 +207,29 @@ export default function TransactionsTable() {
                 type="date" 
                 className="w-40"
                 placeholder="Select date"
+                aria-label="Filter transactions by date"
               />
             </div>
           </div>
         </CardHeader>
         <CardContent className="p-0">
           {isLoading ? (
-            <div className="p-8 text-center">Loading transactions...</div>
+            <div className="p-8 text-center" role="status" aria-live="polite">Loading transactions...</div>
           ) : !transactions || transactions.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">
+            <div className="p-8 text-center text-gray-500" role="status" aria-live="polite">
               No transactions found.
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <Table>
+              <Table aria-label="Recent Transactions">
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Actions</TableHead>
+                    <TableHead scope="col">Date</TableHead>
+                    <TableHead scope="col">Description</TableHead>
+                    <TableHead scope="col">Category</TableHead>
+                    <TableHead scope="col">Type</TableHead>
+                    <TableHead scope="col">Amount</TableHead>
+                    <TableHead scope="col">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -257,15 +259,16 @@ export default function TransactionsTable() {
                       </TableCell>
                       <TableCell>
                         <div className="flex space-x-2">
-                          <Button variant="outline" size="sm">
-                            <Eye className="w-4 h-4" />
+                          <Button variant="outline" size="sm" aria-label={`View details for transaction ${transaction.description}`}>
+                            <Eye className="w-4 h-4" aria-hidden="true" />
                           </Button>
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => handleEdit(transaction)}
+                            aria-label={`Edit transaction ${transaction.description}`}
                           >
-                            <Edit className="w-4 h-4" />
+                            <Edit className="w-4 h-4" aria-hidden="true" />
                           </Button>
                         </div>
                       </TableCell>

@@ -43,13 +43,13 @@ export default function RecentActivity() {
             const Icon = activity.icon;
             
             return (
-              <div key={activity.id} className="flex items-start space-x-3">
-                <div className={`w-8 h-8 ${activity.iconBg} rounded-full flex items-center justify-center flex-shrink-0`}>
+              <div key={activity.id} className="flex items-start space-x-3" role="listitem">
+                <div className={`w-8 h-8 ${activity.iconBg} rounded-full flex items-center justify-center flex-shrink-0`} aria-hidden="true">
                   <Icon className={`${activity.iconColor} text-xs`} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-900">{activity.message}</p>
-                  <p className="text-xs text-gray-500">{activity.time}</p>
+                  <p className="text-xs text-gray-500" aria-label={`Time: ${activity.time}`}>{activity.time}</p>
                 </div>
               </div>
             );

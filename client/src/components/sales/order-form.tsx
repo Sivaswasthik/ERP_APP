@@ -10,47 +10,45 @@ import { ArrowLeft } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
-import { insertOrderSchema } from "@shared/schema";
+import { insertOrderSchema, type IOrder } from "@shared/schema";
 import { z } from "zod";
 
-const formSchema = insertOrderSchema.extend({
-  totalAmount: z.string().min(1, "Total amount is required"),
-});
-
-type FormData = z.infer<typeof formSchema>;
+type FormData = z.infer<typeof insertOrderSchema>;
 
 interface OrderFormProps {
+  order?: IOrder | null;
   onClose: () => void;
 }
 
-export default function OrderForm({ onClose }: OrderFormProps) {
+export default function OrderForm({ order, onClose }: OrderFormProps) {
   const { toast } = useToast();
+  const isEditing = !!order;
 
   const form = useForm<FormData>({
-    resolver: zodResolver(formSchema),
+    resolver: zodResolver(insertOrderSchema),
     defaultValues: {
-      orderNumber: `ORD-${Date.now()}`,
-      customerName: "",
-      customerEmail: "",
-      totalAmount: "",
-      status: "pending",
-      type: "sale",
+      orderNumber: order?.orderNumber || `ORD-${Date.now()}`,
+      customerName: order?.customerName || "",
+      customerEmail: order?.customerEmail || "",
+      totalAmount: order?.totalAmount || 0,
+      status: order?.status || "pending",
+      type: order?.type || "sale",
     },
   });
 
   const createMutation = useMutation({
     mutationFn: async (data: FormData) => {
-      const payload = {
-        ...data,
-        totalAmount: data.totalAmount,
-      };
-      await apiRequest("POST", "/api/orders", payload);
+      if (isEditing && order) {
+        await apiRequest("PUT", `/api/orders/${order.id}`, data);
+      } else {
+        await apiRequest("POST", "/api/orders", data);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
       toast({
         title: "Success",
-        description: "Order created successfully",
+        description: `Order ${isEditing ? "updated" : "created"} successfully`,
       });
       onClose();
     },
@@ -62,15 +60,40 @@ export default function OrderForm({ onClose }: OrderFormProps) {
           variant: "destructive",
         });
         setTimeout(() => {
-          window.location.href = "/api/login";
+          window.location.href = "/login";
         }, 500);
         return;
       }
-      toast({
-        title: "Error",
-        description: "Failed to create order",
-        variant: "destructive",
-      });
+
+      const errorMessage = error.message;
+      const validationPrefix = "Validation Error: ";
+      if (errorMessage.startsWith(validationPrefix)) {
+        const validationErrors = errorMessage.substring(validationPrefix.length).split(', ');
+        validationErrors.forEach(err => {
+          const parts = err.split(' ');
+          const fieldName = parts[0].toLowerCase();
+
+          if (form.getValues().hasOwnProperty(fieldName)) {
+            form.setError(fieldName as keyof FormData, {
+              type: "server",
+              message: err,
+            });
+          } else if (fieldName === 'totalamount' && form.getValues().hasOwnProperty('totalAmount')) {
+            form.setError('totalAmount', { type: "server", message: err });
+          }
+        });
+        toast({
+          title: "Validation Error",
+          description: "Please check the form for errors.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: `Failed to ${isEditing ? "update" : "create"} order: ${error.message}`,
+          variant: "destructive",
+        });
+      }
     },
   });
 
@@ -82,11 +105,13 @@ export default function OrderForm({ onClose }: OrderFormProps) {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center space-x-4">
-        <Button variant="outline" onClick={onClose}>
-          <ArrowLeft className="w-4 h-4 mr-2" />
+        <Button variant="outline" onClick={onClose} aria-label="Back to Orders Table">
+          <ArrowLeft className="w-4 h-4 mr-2" aria-hidden="true" />
           Back
         </Button>
-        <h2 className="text-2xl font-bold text-gray-900">Create New Order</h2>
+        <h2 className="text-2xl font-bold text-gray-900">
+          {isEditing ? "Edit Order" : "Create New Order"}
+        </h2>
       </div>
 
       {/* Form */}
@@ -96,7 +121,7 @@ export default function OrderForm({ onClose }: OrderFormProps) {
         </CardHeader>
         <CardContent>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6" aria-label={isEditing ? "Edit Order Form" : "Create New Order Form"}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField
                   control={form.control}
@@ -105,7 +130,7 @@ export default function OrderForm({ onClose }: OrderFormProps) {
                     <FormItem>
                       <FormLabel>Order Number</FormLabel>
                       <FormControl>
-                        <Input placeholder="Enter order number" {...field} />
+                        <Input placeholder="Enter order number" {...field} aria-required="true" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -120,7 +145,7 @@ export default function OrderForm({ onClose }: OrderFormProps) {
                       <FormLabel>Order Type</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
-                          <SelectTrigger>
+                          <SelectTrigger aria-label="Select order type">
                             <SelectValue />
                           </SelectTrigger>
                         </FormControl>
@@ -141,7 +166,7 @@ export default function OrderForm({ onClose }: OrderFormProps) {
                     <FormItem>
                       <FormLabel>Customer Name</FormLabel>
                       <FormControl>
-                        <Input placeholder="Enter customer name" {...field} />
+                        <Input placeholder="Enter customer name" {...field} aria-required="true" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -159,6 +184,7 @@ export default function OrderForm({ onClose }: OrderFormProps) {
                           type="email" 
                           placeholder="Enter customer email" 
                           {...field} 
+                          aria-required="true"
                         />
                       </FormControl>
                       <FormMessage />
@@ -178,6 +204,8 @@ export default function OrderForm({ onClose }: OrderFormProps) {
                           step="0.01" 
                           placeholder="0.00" 
                           {...field} 
+                          onChange={e => field.onChange(parseFloat(e.target.value))}
+                          aria-required="true"
                         />
                       </FormControl>
                       <FormMessage />
@@ -193,7 +221,7 @@ export default function OrderForm({ onClose }: OrderFormProps) {
                       <FormLabel>Status</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
-                          <SelectTrigger>
+                          <SelectTrigger aria-label="Select order status">
                             <SelectValue />
                           </SelectTrigger>
                         </FormControl>
@@ -210,15 +238,19 @@ export default function OrderForm({ onClose }: OrderFormProps) {
               </div>
 
               <div className="flex justify-end space-x-4">
-                <Button type="button" variant="outline" onClick={onClose}>
+                <Button type="button" variant="outline" onClick={onClose} aria-label="Cancel">
                   Cancel
                 </Button>
                 <Button 
                   type="submit" 
                   disabled={createMutation.isPending}
                   className="bg-primary-500 hover:bg-primary-600"
+                  aria-label={isEditing ? "Update Order" : "Create Order"}
                 >
-                  {createMutation.isPending ? "Creating..." : "Create Order"}
+                  {createMutation.isPending 
+                    ? (isEditing ? "Updating..." : "Creating...") 
+                    : (isEditing ? "Update Order" : "Create Order")
+                  }
                 </Button>
               </div>
             </form>

@@ -11,18 +11,13 @@ import { ArrowLeft } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
-import { insertTransactionSchema, type Transaction } from "@shared/schema";
+import { insertTransactionSchema, type ITransaction } from "@shared/schema";
 import { z } from "zod";
 
-const formSchema = insertTransactionSchema.extend({
-  amount: z.string().min(1, "Amount is required"),
-  date: z.string().min(1, "Date is required"),
-});
-
-type FormData = z.infer<typeof formSchema>;
+type FormData = z.infer<typeof insertTransactionSchema>;
 
 interface TransactionFormProps {
-  transaction?: Transaction | null;
+  transaction?: ITransaction | null;
   onClose: () => void;
 }
 
@@ -31,28 +26,22 @@ export default function TransactionForm({ transaction, onClose }: TransactionFor
   const isEditing = !!transaction;
 
   const form = useForm<FormData>({
-    resolver: zodResolver(formSchema),
+    resolver: zodResolver(insertTransactionSchema),
     defaultValues: {
       description: transaction?.description || "",
-      amount: transaction?.amount?.toString() || "",
+      amount: transaction?.amount || 0,
       type: transaction?.type || "income",
       category: transaction?.category || "",
-      date: transaction?.date ? new Date(transaction.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+      date: transaction?.date ? new Date(transaction.date) : new Date(),
     },
   });
 
   const createMutation = useMutation({
     mutationFn: async (data: FormData) => {
-      const payload = {
-        ...data,
-        amount: data.amount,
-        date: new Date(data.date),
-      };
-      
       if (isEditing && transaction) {
-        await apiRequest("PUT", `/api/transactions/${transaction.id}`, payload);
+        await apiRequest("PUT", `/api/transactions/${transaction.id}`, data);
       } else {
-        await apiRequest("POST", "/api/transactions", payload);
+        await apiRequest("POST", "/api/transactions", data);
       }
     },
     onSuccess: () => {
@@ -71,15 +60,42 @@ export default function TransactionForm({ transaction, onClose }: TransactionFor
           variant: "destructive",
         });
         setTimeout(() => {
-          window.location.href = "/api/login";
+          window.location.href = "/login";
         }, 500);
         return;
       }
-      toast({
-        title: "Error",
-        description: `Failed to ${isEditing ? "update" : "create"} transaction`,
-        variant: "destructive",
-      });
+
+      const errorMessage = error.message;
+      const validationPrefix = "Validation Error: ";
+      if (errorMessage.startsWith(validationPrefix)) {
+        const validationErrors = errorMessage.substring(validationPrefix.length).split(', ');
+        validationErrors.forEach(err => {
+          const parts = err.split(' ');
+          const fieldName = parts[0].toLowerCase();
+
+          if (form.getValues().hasOwnProperty(fieldName)) {
+            form.setError(fieldName as keyof FormData, {
+              type: "server",
+              message: err,
+            });
+          } else if (fieldName === 'amount' && form.getValues().hasOwnProperty('amount')) {
+            form.setError('amount', { type: "server", message: err });
+          } else if (fieldName === 'date' && form.getValues().hasOwnProperty('date')) {
+            form.setError('date', { type: "server", message: err });
+          }
+        });
+        toast({
+          title: "Validation Error",
+          description: "Please check the form for errors.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: `Failed to ${isEditing ? "update" : "create"} transaction: ${error.message}`,
+          variant: "destructive",
+        });
+      }
     },
   });
 
@@ -123,8 +139,8 @@ export default function TransactionForm({ transaction, onClose }: TransactionFor
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center space-x-4">
-        <Button variant="outline" onClick={onClose}>
-          <ArrowLeft className="w-4 h-4 mr-2" />
+        <Button variant="outline" onClick={onClose} aria-label="Back to Transactions Table">
+          <ArrowLeft className="w-4 h-4 mr-2" aria-hidden="true" />
           Back
         </Button>
         <h2 className="text-2xl font-bold text-gray-900">
@@ -139,7 +155,7 @@ export default function TransactionForm({ transaction, onClose }: TransactionFor
         </CardHeader>
         <CardContent>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6" aria-label={isEditing ? "Edit Transaction Form" : "Add New Transaction Form"}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField
                   control={form.control}
@@ -149,7 +165,7 @@ export default function TransactionForm({ transaction, onClose }: TransactionFor
                       <FormLabel>Transaction Type</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
-                          <SelectTrigger>
+                          <SelectTrigger aria-label="Select transaction type">
                             <SelectValue placeholder="Select type" />
                           </SelectTrigger>
                         </FormControl>
@@ -172,7 +188,7 @@ export default function TransactionForm({ transaction, onClose }: TransactionFor
                       <FormLabel>Category</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
-                          <SelectTrigger>
+                          <SelectTrigger aria-label="Select transaction category">
                             <SelectValue placeholder="Select category" />
                           </SelectTrigger>
                         </FormControl>
@@ -201,6 +217,8 @@ export default function TransactionForm({ transaction, onClose }: TransactionFor
                           step="0.01" 
                           placeholder="0.00" 
                           {...field} 
+                          onChange={e => field.onChange(parseFloat(e.target.value))}
+                          aria-required="true"
                         />
                       </FormControl>
                       <FormMessage />
@@ -218,6 +236,9 @@ export default function TransactionForm({ transaction, onClose }: TransactionFor
                         <Input 
                           type="date" 
                           {...field} 
+                          value={field.value ? field.value.toISOString().split('T')[0] : ''}
+                          onChange={e => field.onChange(new Date(e.target.value))}
+                          aria-required="true"
                         />
                       </FormControl>
                       <FormMessage />
@@ -237,6 +258,7 @@ export default function TransactionForm({ transaction, onClose }: TransactionFor
                         placeholder="Enter transaction description" 
                         rows={4}
                         {...field} 
+                        aria-required="true"
                       />
                     </FormControl>
                     <FormMessage />
@@ -245,13 +267,14 @@ export default function TransactionForm({ transaction, onClose }: TransactionFor
               />
 
               <div className="flex justify-end space-x-4">
-                <Button type="button" variant="outline" onClick={onClose}>
+                <Button type="button" variant="outline" onClick={onClose} aria-label="Cancel">
                   Cancel
                 </Button>
                 <Button 
                   type="submit" 
                   disabled={createMutation.isPending}
                   className="bg-primary-500 hover:bg-primary-600"
+                  aria-label={isEditing ? "Update Transaction" : "Create Transaction"}
                 >
                   {createMutation.isPending 
                     ? (isEditing ? "Updating..." : "Creating...") 
